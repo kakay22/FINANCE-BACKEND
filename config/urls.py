@@ -2,14 +2,23 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from django.http import JsonResponse
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
 
+def api_status(request):
+    return JsonResponse({
+        "message": "Finance API is running.",
+        "status": "online",
+    })
 
 urlpatterns = [
+
+    path("", api_status, name="api-status"),
+    
     # Admin
     path(
         "admin/",
