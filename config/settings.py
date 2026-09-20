@@ -25,7 +25,13 @@ SECRET_KEY = 'django-insecure-jasy=g2m$9_bea50rm)qy)9qvaa(vo@p3*%@h*o=)26ij5eyr5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "shylefinance2026.pythonanywhere.com",
+    "localhost",
+    "127.0.0.1",
+]
+
+STATIC_URL = "static/"
 
 
 # Application definition
