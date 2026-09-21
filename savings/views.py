@@ -62,15 +62,25 @@ class SavingsGoalView(
         ).first()
 
         if existing_goal:
-            return Response(
-                {
-                    "detail": (
-                        "You already have an active "
-                        "savings goal."
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            # Check if the current goal is already completed
+            if existing_goal.total_saved >= existing_goal.target_amount:
+                existing_goal.is_active = False
+                existing_goal.save(
+                    update_fields=[
+                        "is_active",
+                        "updated_at",
+                    ]
+                )
+            else:
+                return Response(
+                    {
+                        "detail": (
+                            "You already have an active "
+                            "savings goal."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         serializer = SavingsGoalSerializer(
             data=request.data,
@@ -83,6 +93,7 @@ class SavingsGoalView(
 
         goal = serializer.save()
 
+        # Add the creator as a member
         goal.members.add(request.user)
 
         serializer = SavingsGoalSerializer(
@@ -120,13 +131,23 @@ class SavingsTransactionListCreateView(
 
     def perform_create(self, serializer):
         goal = self.get_goal()
+        user = self.request.user
 
         transaction = serializer.save(
-            user=self.request.user,
+            user=user,
             goal=goal,
         )
 
-        user = self.request.user
+        # Automatically complete the goal
+        # when the target has been reached.
+        if goal.total_saved >= goal.target_amount:
+            goal.is_active = False
+            goal.save(
+                update_fields=[
+                    "is_active",
+                    "updated_at",
+                ]
+            )
 
         if transaction.transaction_type == SavingsTransaction.DEPOSIT:
             # Notify the person who deposited
