@@ -56,21 +56,34 @@ class SavingsGoalView(
         return Response(serializer.data)
 
     def post(self, request):
-        existing_goal = SavingsGoal.objects.filter(
-            members=request.user,
-            is_active=True,
-        ).first()
+        # Look for the user's current active goal directly.
+        # Do NOT call self.get_goal() here because the goal
+        # may be completed and about to be deactivated.
+        existing_goal = (
+            SavingsGoal.objects
+            .filter(
+                members=request.user,
+                is_active=True,
+            )
+            .first()
+        )
 
         if existing_goal:
-            # Check if the current goal is already completed
-            if existing_goal.total_saved >= existing_goal.target_amount:
+            # Completed goal → deactivate it and continue
+            if (
+                existing_goal.total_saved
+                >= existing_goal.target_amount
+            ):
                 existing_goal.is_active = False
+
                 existing_goal.save(
                     update_fields=[
                         "is_active",
                         "updated_at",
                     ]
                 )
+
+            # Incomplete goal → do not allow another goal
             else:
                 return Response(
                     {
@@ -82,6 +95,7 @@ class SavingsGoalView(
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        # Create the new goal
         serializer = SavingsGoalSerializer(
             data=request.data,
             context={"request": request},
@@ -93,9 +107,10 @@ class SavingsGoalView(
 
         goal = serializer.save()
 
-        # Add the creator as a member
+        # Add creator as a member
         goal.members.add(request.user)
 
+        # Return the newly-created goal
         serializer = SavingsGoalSerializer(
             goal,
             context={"request": request},
