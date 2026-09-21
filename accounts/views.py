@@ -2,7 +2,6 @@ from django.contrib.auth.models import User
 from django.http.multipartparser import MultiPartParser
 
 from accounts.models import UserProfile
-from accounts.models import UserProfile
 from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -181,6 +180,41 @@ class ProfileView(APIView):
             )
         )
 
+
+class PublicProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        try:
+            user = User.objects.select_related("profile").get(
+                id=user_id
+            )
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        profile = getattr(user, "profile", None)
+
+        profile_picture = None
+
+        if profile and profile.profile_picture:
+            profile_picture = request.build_absolute_uri(
+                profile.profile_picture.url
+            )
+
+        return Response({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "display_name": (
+                profile.display_name
+                if profile
+                else ""
+            ),
+            "profile_picture": profile_picture,
+        })
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]

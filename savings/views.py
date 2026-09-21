@@ -284,8 +284,14 @@ class SavingsDashboardView(
         # SHARED MEMBERS
         # --------------------------------------------------
 
+        members = (
+            goal.members
+            .all()
+            .select_related("profile")
+        )
+
         member_ids = list(
-            goal.members.values_list(
+            members.values_list(
                 "id",
                 flat=True,
             )
@@ -343,9 +349,6 @@ class SavingsDashboardView(
 
         # --------------------------------------------------
         # AVAILABLE SAVINGS
-        #
-        # This is the actual money still available for
-        # the housing goal.
         # --------------------------------------------------
 
         available_savings = max(
@@ -387,29 +390,77 @@ class SavingsDashboardView(
         total_transactions = transactions.count()
 
         # --------------------------------------------------
-        # CONTRIBUTIONS BY USER
+        # CONTRIBUTIONS BY SHARED MEMBER
+        #
+        # IMPORTANT:
+        # We use goal.members instead of only transactions.
+        #
+        # This means both partners appear even when one
+        # has contributed ₱0.00 so far.
         # --------------------------------------------------
 
-        contribution_data = (
+        contribution_totals = (
             transactions
-            .values(
-                "user_id",
-                "user__username",
-            )
-            .annotate(
-                total=Sum("amount"),
-            )
-            .order_by("-total")
+            .values("user_id")
+            .annotate(total=Sum("amount"))
         )
 
-        contributions = [
-            {
-                "user_id": item["user_id"],
-                "username": item["user__username"],
-                "amount": item["total"],
-            }
-            for item in contribution_data
-        ]
+        contribution_map = {
+            item["user_id"]: (
+                item["total"]
+                or Decimal("0.00")
+            )
+            for item in contribution_totals
+        }
+
+        contributions = []
+
+        for member in members:
+            profile = getattr(
+                member,
+                "profile",
+                None,
+            )
+
+            profile_picture = None
+
+            if (
+                profile
+                and profile.profile_picture
+            ):
+                profile_picture = request.build_absolute_uri(
+                    profile.profile_picture.url
+                )
+
+            contributions.append(
+                {
+                    "user_id": member.id,
+                    "username": member.username,
+                    "display_name": (
+                        profile.display_name
+                        if profile
+                        else ""
+                    ),
+                    "profile_picture": (
+                        profile_picture
+                    ),
+                    "amount": contribution_map.get(
+                        member.id,
+                        Decimal("0.00"),
+                    ),
+                }
+            )
+
+        # --------------------------------------------------
+        # SORT CONTRIBUTORS
+        #
+        # Users who contributed the most appear first.
+        # --------------------------------------------------
+
+        contributions.sort(
+            key=lambda item: item["amount"],
+            reverse=True,
+        )
 
         # --------------------------------------------------
         # MONTHLY AVERAGE
@@ -418,7 +469,10 @@ class SavingsDashboardView(
         today = timezone.now().date()
 
         months_elapsed = (
-            (today.year - goal.start_date.year) * 12
+            (
+                today.year
+                - goal.start_date.year
+            ) * 12
             + today.month
             - goal.start_date.month
         )
@@ -457,7 +511,9 @@ class SavingsDashboardView(
                 "id": transaction.id,
                 "user": {
                     "id": transaction.user.id,
-                    "username": transaction.user.username,
+                    "username": (
+                        transaction.user.username
+                    ),
                 },
                 "transaction_type": (
                     transaction.transaction_type
@@ -491,26 +547,29 @@ class SavingsDashboardView(
                     },
                 ).data,
 
-                # Original contributions
-                "total_saved": total_contributions,
+                "total_saved": (
+                    total_contributions
+                ),
 
                 "total_contributions": (
                     total_contributions
                 ),
 
-                # Borrowing taken from savings
-                "total_borrowed": total_borrowed,
+                "total_borrowed": (
+                    total_borrowed
+                ),
 
-                # Borrowing minus repayments
                 "outstanding_borrowings": (
                     outstanding_borrowings
                 ),
 
-                # Actual available housing money
-                "available_savings": available_savings,
+                "available_savings": (
+                    available_savings
+                ),
 
-                # Amount still needed for target
-                "remaining_amount": remaining_amount,
+                "remaining_amount": (
+                    remaining_amount
+                ),
 
                 "progress_percentage": (
                     progress_percentage

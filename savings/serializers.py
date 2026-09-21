@@ -21,6 +21,46 @@ class UserSimpleSerializer(serializers.ModelSerializer):
         )
 
 
+class GoalMemberSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "display_name",
+            "profile_picture",
+        )
+
+    def get_display_name(self, obj):
+        profile = getattr(obj, "profile", None)
+
+        if profile and profile.display_name:
+            return profile.display_name
+
+        return obj.username
+
+    def get_profile_picture(self, obj):
+        profile = getattr(obj, "profile", None)
+
+        if not profile:
+            return None
+
+        if not profile.profile_picture:
+            return None
+
+        request = self.context.get("request")
+
+        if request:
+            return request.build_absolute_uri(
+                profile.profile_picture.url
+            )
+
+        return profile.profile_picture.url
+
+
 class TransactionProofSerializer(
     serializers.ModelSerializer
 ):
@@ -61,18 +101,30 @@ class TransactionProofSerializer(
         return file
 
 
-class SavingsTransactionSerializer(serializers.ModelSerializer):
-    user = UserSimpleSerializer(read_only=True)
-    recipient = UserSimpleSerializer(read_only=True)
+class SavingsTransactionSerializer(
+    serializers.ModelSerializer
+):
+    user = UserSimpleSerializer(
+        read_only=True
+    )
+
+    recipient = UserSimpleSerializer(
+        read_only=True
+    )
+
     recipient_id = serializers.IntegerField(
         write_only=True,
         required=False,
         allow_null=True,
     )
-    proof = TransactionProofSerializer(read_only=True)
+
+    proof = TransactionProofSerializer(
+        read_only=True
+    )
 
     class Meta:
         model = SavingsTransaction
+
         fields = (
             "id",
             "goal",
@@ -88,6 +140,7 @@ class SavingsTransactionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
         read_only_fields = (
             "id",
             "goal",
@@ -114,7 +167,9 @@ class SavingsTransactionSerializer(serializers.ModelSerializer):
             else SavingsTransaction.DEPOSIT,
         )
 
-        recipient_id = attrs.get("recipient_id")
+        recipient_id = attrs.get(
+            "recipient_id"
+        )
 
         if transaction_type == SavingsTransaction.TRANSFER:
             if not recipient_id:
@@ -125,9 +180,14 @@ class SavingsTransactionSerializer(serializers.ModelSerializer):
                     )
                 })
 
-            request = self.context.get("request")
+            request = self.context.get(
+                "request"
+            )
 
-            if not request or not request.user.is_authenticated:
+            if (
+                not request
+                or not request.user.is_authenticated
+            ):
                 raise serializers.ValidationError(
                     "Authentication is required."
                 )
@@ -150,7 +210,10 @@ class SavingsTransactionSerializer(serializers.ModelSerializer):
                 })
 
             member_ids = set(
-                goal.members.values_list("id", flat=True)
+                goal.members.values_list(
+                    "id",
+                    flat=True,
+                )
             )
 
             if recipient_id not in member_ids:
@@ -181,7 +244,22 @@ class SavingsTransactionSerializer(serializers.ModelSerializer):
 class SavingsGoalSerializer(
     serializers.ModelSerializer
 ):
-    members = UserSimpleSerializer(
+    """
+    Serializes a shared savings goal.
+
+    IMPORTANT:
+    `members` contains ALL members of the shared goal,
+    regardless of whether they have contributed money.
+
+    Example:
+
+        Kyle       -> ₱30,000
+        Partner    -> ₱0
+
+    Both Kyle and Partner are returned in `members`.
+    """
+
+    members = GoalMemberSerializer(
         many=True,
         read_only=True,
     )
@@ -221,7 +299,6 @@ class SavingsGoalSerializer(
             "target_amount",
             "members",
             "start_date",
-
             "is_active",
 
             "total_saved",
@@ -241,13 +318,16 @@ class SavingsGoalSerializer(
             "id",
             "members",
             "start_date",
+
             "total_saved",
             "total_contributions",
             "total_borrowed",
             "outstanding_borrowings",
             "available_savings",
+
             "remaining_amount",
             "progress_percentage",
+
             "created_at",
             "updated_at",
         )
@@ -271,12 +351,19 @@ class SavingsGoalSerializer(
         )
 
         return Borrowing.objects.filter(
-            Q(borrower_id__in=member_ids)
-            | Q(lender_id__in=member_ids)
+            Q(
+                borrower_id__in=member_ids
+            )
+            |
+            Q(
+                lender_id__in=member_ids
+            )
         ).distinct()
 
     def _get_total_borrowed(self, obj):
-        borrowings = self._get_borrowings(obj)
+        borrowings = self._get_borrowings(
+            obj
+        )
 
         return (
             borrowings.aggregate(
@@ -288,7 +375,9 @@ class SavingsGoalSerializer(
     def _get_total_repaid(self, obj):
         from borrowings.models import Repayment
 
-        borrowings = self._get_borrowings(obj)
+        borrowings = self._get_borrowings(
+            obj
+        )
 
         return (
             Repayment.objects.filter(
@@ -300,17 +389,28 @@ class SavingsGoalSerializer(
         )
 
     def get_total_contributions(self, obj):
-        return self._get_contributions(obj)
+        return self._get_contributions(
+            obj
+        )
 
     def get_total_saved(self, obj):
-        return self.get_available_savings(obj)
+        return self.get_available_savings(
+            obj
+        )
 
     def get_total_borrowed(self, obj):
-        return self._get_total_borrowed(obj)
+        return self._get_total_borrowed(
+            obj
+        )
 
     def get_outstanding_borrowings(self, obj):
-        total_borrowed = self._get_total_borrowed(obj)
-        total_repaid = self._get_total_repaid(obj)
+        total_borrowed = (
+            self._get_total_borrowed(obj)
+        )
+
+        total_repaid = (
+            self._get_total_repaid(obj)
+        )
 
         return max(
             total_borrowed - total_repaid,
@@ -318,8 +418,15 @@ class SavingsGoalSerializer(
         )
 
     def get_available_savings(self, obj):
-        contributions = self._get_contributions(obj)
-        outstanding = self.get_outstanding_borrowings(obj)
+        contributions = (
+            self._get_contributions(obj)
+        )
+
+        outstanding = (
+            self.get_outstanding_borrowings(
+                obj
+            )
+        )
 
         return max(
             contributions - outstanding,
@@ -327,7 +434,9 @@ class SavingsGoalSerializer(
         )
 
     def get_remaining_amount(self, obj):
-        available = self.get_available_savings(obj)
+        available = (
+            self.get_available_savings(obj)
+        )
 
         return max(
             obj.target_amount - available,
@@ -335,13 +444,19 @@ class SavingsGoalSerializer(
         )
 
     def get_progress_percentage(self, obj):
-        available = self.get_available_savings(obj)
+        available = (
+            self.get_available_savings(obj)
+        )
 
-        if obj.target_amount <= Decimal("0.00"):
+        if (
+            obj.target_amount
+            <= Decimal("0.00")
+        ):
             return Decimal("0.00")
 
         percentage = (
-            available / obj.target_amount
+            available
+            / obj.target_amount
         ) * Decimal("100")
 
         return min(
@@ -360,14 +475,18 @@ class SavingsDashboardSerializer(
         decimal_places=2,
     )
 
-    total_contributions = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
+    total_contributions = (
+        serializers.DecimalField(
+            max_digits=12,
+            decimal_places=2,
+        )
     )
 
-    total_borrowed = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
+    total_borrowed = (
+        serializers.DecimalField(
+            max_digits=12,
+            decimal_places=2,
+        )
     )
 
     outstanding_borrowings = (
@@ -377,26 +496,36 @@ class SavingsDashboardSerializer(
         )
     )
 
-    available_savings = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
+    available_savings = (
+        serializers.DecimalField(
+            max_digits=12,
+            decimal_places=2,
+        )
     )
 
-    remaining_amount = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
+    remaining_amount = (
+        serializers.DecimalField(
+            max_digits=12,
+            decimal_places=2,
+        )
     )
 
-    progress_percentage = serializers.DecimalField(
-        max_digits=6,
-        decimal_places=2,
+    progress_percentage = (
+        serializers.DecimalField(
+            max_digits=6,
+            decimal_places=2,
+        )
     )
 
-    total_transactions = serializers.IntegerField()
+    total_transactions = (
+        serializers.IntegerField()
+    )
 
-    average_monthly_savings = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
+    average_monthly_savings = (
+        serializers.DecimalField(
+            max_digits=12,
+            decimal_places=2,
+        )
     )
 
     estimated_months_remaining = (

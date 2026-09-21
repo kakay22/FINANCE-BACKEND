@@ -58,3 +58,46 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
 
         return user
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(
+        source="user.username",
+        read_only=True,
+    )
+
+    email = serializers.EmailField(
+        source="user.email",
+        read_only=True,
+    )
+
+    profile_picture = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = (
+            "id",
+            "username",
+            "email",
+            "display_name",
+            "profile_picture",
+        )
+        read_only_fields = (
+            "id",
+            "username",
+            "email",
+            "profile_picture",
+        )
+
+    def get_profile_picture(self, obj):
+        if not obj.profile_picture:
+            return None
+
+        request = self.context.get("request")
+
+        if request:
+            return request.build_absolute_uri(
+                obj.profile_picture.url
+            )
+
+        return obj.profile_picture.url
