@@ -55,6 +55,46 @@ class SavingsGoalView(
 
         return Response(serializer.data)
 
+    def post(self, request):
+        existing_goal = SavingsGoal.objects.filter(
+            members=request.user,
+            is_active=True,
+        ).first()
+
+        if existing_goal:
+            return Response(
+                {
+                    "detail": (
+                        "You already have an active "
+                        "savings goal."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = SavingsGoalSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        goal = serializer.save()
+
+        goal.members.add(request.user)
+
+        serializer = SavingsGoalSerializer(
+            goal,
+            context={"request": request},
+        )
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class SavingsTransactionListCreateView(
     UserGoalMixin,
