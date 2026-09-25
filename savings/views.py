@@ -153,19 +153,19 @@ class SavingsTransactionListCreateView(
             goal=goal,
         )
 
-        # Automatically complete the goal
-        # when the target has been reached.
-        if goal.total_saved >= goal.target_amount:
-            goal.is_active = False
-            goal.save(
-                update_fields=[
-                    "is_active",
-                    "updated_at",
-                ]
-            )
+        # IMPORTANT:
+        # Do NOT deactivate the goal when it reaches 100%.
+        #
+        # The completed goal remains the active/current goal
+        # so the dashboard can continue displaying it.
+        #
+        # It will only be deactivated when the user creates
+        # a new savings goal.
 
-        if transaction.transaction_type == SavingsTransaction.DEPOSIT:
-            # Notify the person who deposited
+        if (
+            transaction.transaction_type
+            == SavingsTransaction.DEPOSIT
+        ):
             create_notification(
                 user=user,
                 notification_type=Notification.TRANSACTION,
@@ -176,7 +176,6 @@ class SavingsTransactionListCreateView(
                 ),
             )
 
-            # Notify the other members
             other_members = goal.members.exclude(
                 id=user.id
             )
@@ -193,7 +192,10 @@ class SavingsTransactionListCreateView(
                     ),
                 )
 
-        elif transaction.transaction_type == SavingsTransaction.TRANSFER:
+        elif (
+            transaction.transaction_type
+            == SavingsTransaction.TRANSFER
+        ):
             recipient = transaction.recipient
 
             create_notification(
