@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 from rest_framework import generics, status
 from rest_framework.parsers import (
@@ -59,6 +60,12 @@ class SavingsGoalView(
         # Look for the user's current active goal directly.
         # Do NOT call self.get_goal() here because the goal
         # may be completed and about to be deactivated.
+
+        member_ids = request.data.get(
+            "member_ids",
+            []
+        )
+
         existing_goal = (
             SavingsGoal.objects
             .filter(
@@ -107,8 +114,15 @@ class SavingsGoalView(
 
         goal = serializer.save()
 
-        # Add creator as a member
+        # Creator is ALWAYS a member.
         goal.members.add(request.user)
+
+        # Add selected registered users.
+        selected_members = User.objects.filter(
+            id__in=member_ids
+        )
+
+        goal.members.add(*selected_members)
 
         # Return the newly-created goal
         serializer = SavingsGoalSerializer(

@@ -259,6 +259,12 @@ class SavingsGoalSerializer(
     Both Kyle and Partner are returned in `members`.
     """
 
+    member_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False,
+    )
+
     members = GoalMemberSerializer(
         many=True,
         read_only=True,
@@ -298,6 +304,7 @@ class SavingsGoalSerializer(
             "name",
             "target_amount",
             "members",
+            "member_ids",
             "start_date",
             "is_active",
 
