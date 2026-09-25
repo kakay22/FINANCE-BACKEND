@@ -168,28 +168,25 @@ class SavingsTransactionListCreateView(
         )
 
         # IMPORTANT:
-        # Do NOT deactivate the goal when it reaches 100%.
-        #
-        # The completed goal remains the active/current goal
-        # so the dashboard can continue displaying it.
-        #
-        # It will only be deactivated when the user creates
-        # a new savings goal.
+        # Reaching the savings target does NOT deactivate the goal.
+        # The completed goal remains active until a new goal is created.
 
         if (
             transaction.transaction_type
             == SavingsTransaction.DEPOSIT
         ):
+            # Notify the user who made the deposit.
             create_notification(
                 user=user,
                 notification_type=Notification.TRANSACTION,
                 title="Money deposited",
                 message=(
                     f"₱{transaction.amount:,.2f} "
-                    "was added to your savings."
+                    f"was added to {goal.name}."
                 ),
             )
 
+            # Notify the other members of the shared goal.
             other_members = goal.members.exclude(
                 id=user.id
             )
@@ -202,7 +199,7 @@ class SavingsTransactionListCreateView(
                     message=(
                         f"{user.username} deposited "
                         f"₱{transaction.amount:,.2f} "
-                        "into the shared savings fund."
+                        f"into {goal.name}."
                     ),
                 )
 
@@ -212,6 +209,7 @@ class SavingsTransactionListCreateView(
         ):
             recipient = transaction.recipient
 
+            # Notify sender.
             create_notification(
                 user=user,
                 notification_type=Notification.TRANSACTION,
@@ -223,6 +221,7 @@ class SavingsTransactionListCreateView(
                 ),
             )
 
+            # Notify recipient.
             create_notification(
                 user=recipient,
                 notification_type=Notification.TRANSACTION,
@@ -233,7 +232,6 @@ class SavingsTransactionListCreateView(
                     f"from {user.username}."
                 ),
             )
-
 
 class SavingsTransactionDetailView(
     UserGoalMixin,
