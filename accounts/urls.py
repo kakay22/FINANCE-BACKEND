@@ -5,6 +5,7 @@ from .views import (
     RegisterView,
     ProfileView,
     PublicProfileView,
+    GoalMemberListView,
 )
 
 
@@ -31,5 +32,10 @@ urlpatterns = [
         "change-password/",
         ChangePasswordView.as_view(),
         name="change-password",
+    ),
+    path(
+        "users/",
+        GoalMemberListView.as_view(),
+        name="goal-member-list",
     ),
 ]

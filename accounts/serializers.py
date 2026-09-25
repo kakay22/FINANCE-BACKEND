@@ -101,3 +101,43 @@ class UserProfileSerializer(serializers.ModelSerializer):
             )
 
         return obj.profile_picture.url
+
+class GoalMemberSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "email",
+            "display_name",
+            "profile_picture",
+        )
+
+    def get_display_name(self, obj):
+        try:
+            profile = obj.profile
+            return profile.display_name or obj.username
+        except UserProfile.DoesNotExist:
+            return obj.username
+
+    def get_profile_picture(self, obj):
+        try:
+            profile = obj.profile
+
+            if not profile.profile_picture:
+                return None
+
+            request = self.context.get("request")
+
+            if request:
+                return request.build_absolute_uri(
+                    profile.profile_picture.url
+                )
+
+            return profile.profile_picture.url
+
+        except UserProfile.DoesNotExist:
+            return None

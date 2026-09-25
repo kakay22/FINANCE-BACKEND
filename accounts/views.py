@@ -281,3 +281,23 @@ class ChangePasswordView(APIView):
         return Response({
             "detail": "Password changed successfully."
         })
+
+from django.contrib.auth.models import User
+
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated
+
+from .serializers import GoalMemberSerializer
+
+
+class GoalMemberListView(ListAPIView):
+    serializer_class = GoalMemberSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            User.objects
+            .filter(is_active=True)
+            .select_related("profile")
+            .order_by("username")
+        )
