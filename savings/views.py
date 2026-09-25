@@ -57,15 +57,18 @@ class SavingsGoalView(
         return Response(serializer.data)
 
     def post(self, request):
-        # Look for the user's current active goal directly.
-        # Do NOT call self.get_goal() here because the goal
-        # may be completed and about to be deactivated.
-
+        # Selected additional members.
+        # The creator is added automatically below.
         member_ids = request.data.get(
             "member_ids",
-            []
+            [],
         )
 
+        # Protect against malformed frontend data.
+        if not isinstance(member_ids, list):
+            member_ids = []
+
+        # Find the creator's current active goal.
         existing_goal = (
             SavingsGoal.objects
             .filter(
@@ -76,7 +79,8 @@ class SavingsGoalView(
         )
 
         if existing_goal:
-            # Completed goal → deactivate it and continue
+            # Allow a new goal only when the current goal
+            # has already reached its target.
             if (
                 existing_goal.total_saved
                 >= existing_goal.target_amount
@@ -90,7 +94,6 @@ class SavingsGoalView(
                     ]
                 )
 
-            # Incomplete goal → do not allow another goal
             else:
                 return Response(
                     {
@@ -102,10 +105,12 @@ class SavingsGoalView(
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # Create the new goal
+        # Validate and create the new goal.
         serializer = SavingsGoalSerializer(
             data=request.data,
-            context={"request": request},
+            context={
+                "request": request,
+            },
         )
 
         serializer.is_valid(
@@ -114,24 +119,36 @@ class SavingsGoalView(
 
         goal = serializer.save()
 
-        # Creator is ALWAYS a member.
+        # Creator is always a member.
         goal.members.add(request.user)
 
-        # Add selected registered users.
-        selected_members = User.objects.filter(
-            id__in=member_ids
+        # Add selected additional members.
+        selected_members = (
+            User.objects
+            .filter(
+                id__in=member_ids,
+                is_active=True,
+            )
+            .exclude(
+                id=request.user.id
+            )
         )
 
-        goal.members.add(*selected_members)
+        goal.members.add(
+            *selected_members
+        )
 
-        # Return the newly-created goal
-        serializer = SavingsGoalSerializer(
+        # Return the completed goal object,
+        # including its members.
+        response_serializer = SavingsGoalSerializer(
             goal,
-            context={"request": request},
+            context={
+                "request": request,
+            },
         )
 
         return Response(
-            serializer.data,
+            response_serializer.data,
             status=status.HTTP_201_CREATED,
         )
 

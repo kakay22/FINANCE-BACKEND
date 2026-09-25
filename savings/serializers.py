@@ -296,6 +296,15 @@ class SavingsGoalSerializer(
         serializers.SerializerMethodField()
     )
 
+    def create(self, validated_data):
+        # member_ids is only used for selecting goal members.
+        # It is not a field on the SavingsGoal model.
+        validated_data.pop("member_ids", None)
+
+        return SavingsGoal.objects.create(
+            **validated_data
+        )
+
     class Meta:
         model = SavingsGoal
 
