@@ -701,3 +701,22 @@ class SavingsDashboardView(
                 ),
             }
         )
+
+class SavingsGoalHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        goals = (
+            SavingsGoal.objects
+            .filter(members=request.user)
+            .prefetch_related("members")
+            .order_by("-is_active", "-created_at")
+        )
+
+        serializer = SavingsGoalSerializer(
+            goals,
+            many=True,
+            context={"request": request},
+        )
+
+        return Response(serializer.data)

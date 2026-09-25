@@ -6,6 +6,7 @@ from .views import (
     SavingsTransactionListCreateView,
     SavingsTransactionDetailView,
     TransactionProofView,
+    SavingsGoalHistoryView,
 )
 
 
@@ -38,5 +39,11 @@ urlpatterns = [
         "transactions/<int:transaction_id>/proof/",
         TransactionProofView.as_view(),
         name="transaction-proof",
+    ),
+
+    path(
+        "goals/",
+        SavingsGoalHistoryView.as_view(),
+        name="savings-goal-history",
     ),
 ]
